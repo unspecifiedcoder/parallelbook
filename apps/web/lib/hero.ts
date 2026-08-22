@@ -129,6 +129,11 @@ export async function readHero(): Promise<HeroPayload> {
 
 		const open = markets.find((m) => m.phase === PHASE.Open)
 		const chosen = open ?? markets.find((m) => m.outcome !== OUTCOME.Unresolved) ?? markets[0]
+		// The empty-list case returned above, so markets[0] exists; the index
+		// signature just cannot prove it.
+		if (!chosen) {
+			return { live: false, reason: "no rounds have been created yet", market: exampleMarket() }
+		}
 
 		// The stream row carries resolvingStartsAt, which gates tradeability. Its
 		// absence must not blank the hero, so this is best-effort.

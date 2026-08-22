@@ -150,6 +150,10 @@ export function DepthLadder({
 					<tbody>
 						{visible.map((t) => {
 							const l = levels[t]
+							// `visible` only ever holds indices this component already
+							// bounds-checked, but noUncheckedIndexedAccess types the
+							// access as possibly undefined. Skip rather than assert.
+							if (!l) return null
 							const myYes = mineYes?.[t] ?? 0n
 							const myNo = mineNo?.[t] ?? 0n
 							const flash = flashTicks?.includes(t) ?? false

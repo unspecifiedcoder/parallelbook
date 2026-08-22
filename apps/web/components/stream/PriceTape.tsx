@@ -75,10 +75,12 @@ export function PriceTape({ feed, intervalMs = 1_000 }: PriceTapeProps) {
 		}
 	}, [feed.id, intervalMs])
 
-	const last = samples.length > 0 ? samples[samples.length - 1].p : null
-	const prev = samples.length > 1 ? samples[samples.length - 2].p : null
+	// The length checks already prove these are present; ?? null satisfies
+	// noUncheckedIndexedAccess without changing behaviour.
+	const last = samples[samples.length - 1]?.p ?? null
+	const prev = samples.length > 1 ? (samples[samples.length - 2]?.p ?? null) : null
 	const dir = last !== null && prev !== null ? Math.sign(last - prev) : 0
-	const first = samples.length > 0 ? samples[0].p : null
+	const first = samples[0]?.p ?? null
 	const change = last !== null && first !== null && first !== 0 ? ((last - first) / first) * 100 : null
 
 	return (

@@ -75,5 +75,8 @@ export const FEED_CACHE_MS = 1_000
 export const TAPE_SAMPLES = 60
 
 export function feedFor(id?: string): Feed {
-	return FEEDS[id ?? DEFAULT_FEED_ID] ?? FEEDS[DEFAULT_FEED_ID]
+	// DEFAULT_FEED_ID is a key of FEEDS by construction, but an index signature
+	// cannot say so. The non-null assertion is on the default only -- an unknown
+	// id still falls back rather than throwing.
+	return FEEDS[id ?? DEFAULT_FEED_ID] ?? FEEDS[DEFAULT_FEED_ID]!
 }

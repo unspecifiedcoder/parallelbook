@@ -226,7 +226,7 @@ function lastPathSegment(url?: string): string | null {
 	if (!url) return null
 	try {
 		const parts = new URL(url).pathname.split("/").filter(Boolean)
-		return parts.length > 0 ? parts[parts.length - 1] : null
+		return parts[parts.length - 1] ?? null
 	} catch {
 		return null
 	}
@@ -240,7 +240,7 @@ export function youtubeId(url?: string): string | null {
 		const v = u.searchParams.get("v")
 		if (v) return v
 		const m = u.pathname.match(/\/(?:live|embed|shorts)\/([A-Za-z0-9_-]{6,})/)
-		return m ? m[1] : null
+		return m?.[1] ?? null
 	} catch {
 		return null
 	}
@@ -250,7 +250,7 @@ export function twitchChannel(url?: string): string | null {
 	if (!url) return null
 	try {
 		const parts = new URL(url).pathname.split("/").filter(Boolean)
-		return parts.length > 0 ? parts[0] : null
+		return parts[0] ?? null
 	} catch {
 		return null
 	}

@@ -53,6 +53,11 @@ export default async function MarketPage({ params }: Params) {
 		// not a crash.
 		notFound()
 	}
+	// notFound() never returns, so this line is unreachable whenever the read
+	// failed. It exists so the compiler knows that too: tsc can only see
+	// notFound()'s `never` return once next/navigation resolves, and a throw
+	// narrows regardless.
+	if (!snap) throw new Error("unreachable: notFound() does not return")
 
 	let streamMeta = null
 	try {

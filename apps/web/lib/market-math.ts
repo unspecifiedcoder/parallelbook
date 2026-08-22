@@ -136,6 +136,7 @@ export function impliedBps(book: readonly TickLevel[]): bigint {
 	let den = 0n
 	for (let i = 0; i < book.length && i < NUM_TICKS; i++) {
 		const t = book[i]
+		if (!t) continue
 		const w = t.matched * 2n + t.openYes + t.openNo
 		num += w * price(i)
 		den += w
