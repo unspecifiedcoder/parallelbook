@@ -1,0 +1,13 @@
+# The repo lives on a Windows mount but is edited from WSL. Without this, every
+# file round-trips CRLF<->LF and a one-line change shows up as a 15,000-line diff.
+# Text files are normalized to LF in the index; checkout follows the platform.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
