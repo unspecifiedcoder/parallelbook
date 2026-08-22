@@ -11,6 +11,28 @@ const nextConfig = {
 		externalDir: true,
 	},
 
+	// @coinbase/cdp-sdk ships an x402 payment path that imports @x402/* as
+	// OPTIONAL peers, and does it with static imports, so webpack tries to
+	// resolve them whether or not the code runs. Nothing here uses Base Account
+	// payments -- the SDK arrives transitively via
+	// @privy-io/wagmi -> wagmi -> @wagmi/connectors -> @base-org/account -- so
+	// the modules are aliased to false and webpack substitutes an empty module.
+	//
+	// Installing the @x402 packages instead would add a payments SDK to the
+	// bundle to satisfy an import path the app never takes.
+	webpack: (config) => {
+		config.resolve.alias = {
+			...config.resolve.alias,
+			"@x402/core/client": false,
+			"@x402/evm": false,
+			"@x402/evm/exact/client": false,
+			"@x402/evm/upto/client": false,
+			"@x402/svm": false,
+			"@x402/svm/exact/client": false,
+		}
+		return config
+	},
+
 	// A prediction market must never be served stale. Every price-bearing route
 	// opts out of caching explicitly at the route level; this is belt and braces
 	// for the shell.
