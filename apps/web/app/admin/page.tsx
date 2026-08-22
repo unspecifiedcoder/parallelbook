@@ -13,6 +13,12 @@ import { OUTCOME, PHASE, marketAbi } from "../../lib/abi"
 import { publicClient, readMarketList, type MarketSnapshot } from "../../lib/market-client"
 import { formatBps } from "../../lib/market-math"
 
+// Wallet state is per-visitor and only exists in the browser, so there is
+// nothing correct to prerender: wagmi's hooks throw at build time because
+// no WagmiProvider exists on the server. Every other wallet-facing page in
+// this app already opts out the same way.
+export const dynamic = "force-dynamic"
+
 /**
  * Resolver console.
  *

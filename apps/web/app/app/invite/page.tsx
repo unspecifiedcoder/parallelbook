@@ -1,6 +1,12 @@
 import { AppNav } from "../../../components/AppNav"
 import { ReferralPanel } from "../../../components/ReferralPanel"
 
+// Wallet state is per-visitor and only exists in the browser, so there is
+// nothing correct to prerender: wagmi's hooks throw at build time because
+// no WagmiProvider exists on the server. Every other wallet-facing page in
+// this app already opts out the same way.
+export const dynamic = "force-dynamic"
+
 export const metadata = { title: "Invite" }
 
 export default function InvitePage() {
