@@ -127,12 +127,20 @@ contract InvariantTest is StdInvariant, Test {
 
     /// A matched pair is funded by its own two participants and nothing else:
     /// YES paid p, NO paid 1-p, and rounding is always up, so the pair holds >= 1.00.
+    ///
+    /// Both legs must be rounded UP here, exactly as Market.cost and the
+    /// withdrawOrder refund do it. Rounding down instead makes this invariant
+    /// fail on almost every book: the two legs' fractional parts sum to exactly
+    /// one, so two floors sum to pairs - 1 whenever pairs * price is not a
+    /// multiple of ONE, and the shrinker reports a 1 wei shortfall that the
+    /// contract does not actually have.
     function invariant_matched_pair_fully_collateralised() public view {
         for (uint8 t; t < m.NUM_TICKS(); ++t) {
             uint256 pairs = m.ticks(t).matched;
             if (pairs == 0) continue;
-            uint256 yesLeg = pairs * m.legPrice(t, true) / m.ONE();
-            uint256 noLeg = pairs * m.legPrice(t, false) / m.ONE();
+            uint256 one = m.ONE();
+            uint256 yesLeg = (pairs * m.legPrice(t, true) + one - 1) / one;
+            uint256 noLeg = (pairs * m.legPrice(t, false) + one - 1) / one;
             assertGe(yesLeg + noLeg, pairs, "pair collateral below 1.00 per share");
         }
     }

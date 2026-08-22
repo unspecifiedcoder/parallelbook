@@ -246,51 +246,62 @@ contract Market {
         return _matchTick(tick, maxSteps);
     }
 
+    /// @dev Fill one resting YES order against one resting NO order, and credit
+    ///      both makers. Split out of the matching loop on purpose: holding the
+    ///      tick struct, both order arrays, both cursors, the step counter and
+    ///      both order pointers live at once overflows the EVM's 16-slot stack,
+    ///      and the contract does not compile without via-ir. Keeping the pair
+    ///      fill in its own frame is cheaper than turning via-ir on for the whole
+    ///      project. Writes stay inside tick `tick` -- the parallelism contract
+    ///      at the top of this file still holds.
+    function _fillPair(uint8 tick, Order storage yo, Order storage no_) private returns (uint128 fill) {
+        uint128 yRem = yo.shares - yo.filled;
+        uint128 nRem = no_.shares - no_.filled;
+        fill = yRem < nRem ? yRem : nRem;
+
+        yo.filled += fill;
+        no_.filled += fill;
+
+        yesPos[tick][yo.maker] += fill;
+        noPos[tick][no_.maker] += fill;
+    }
+
     function _matchTick(uint8 tick, uint32 maxSteps) internal returns (uint128 filledTotal) {
-        Tick storage t = _ticks[tick];
         Order[] storage ys = yesOrders[tick];
         Order[] storage ns = noOrders[tick];
 
-        uint32 y = t.yesCursor;
-        uint32 n = t.noCursor;
+        uint32 y = _ticks[tick].yesCursor;
+        uint32 n = _ticks[tick].noCursor;
         uint32 steps;
 
         while (steps < maxSteps && y < ys.length && n < ns.length) {
-            Order storage yo = ys[y];
-            if (yo.withdrawn || yo.filled == yo.shares) {
+            if (ys[y].withdrawn || ys[y].filled == ys[y].shares) {
                 ++y;
                 ++steps;
                 continue;
             }
-            Order storage no_ = ns[n];
-            if (no_.withdrawn || no_.filled == no_.shares) {
+            if (ns[n].withdrawn || ns[n].filled == ns[n].shares) {
                 ++n;
                 ++steps;
                 continue;
             }
 
-            uint128 yRem = yo.shares - yo.filled;
-            uint128 nRem = no_.shares - no_.filled;
-            uint128 fill = yRem < nRem ? yRem : nRem;
-
-            yo.filled += fill;
-            no_.filled += fill;
-
-            yesPos[tick][yo.maker] += fill;
-            noPos[tick][no_.maker] += fill;
-
-            t.openYes -= fill;
-            t.openNo -= fill;
-            t.matched += fill;
-            filledTotal += fill;
-
+            filledTotal += _fillPair(tick, ys[y], ns[n]);
             ++steps;
         }
 
+        Tick storage t = _ticks[tick];
         t.yesCursor = y;
         t.noCursor = n;
 
+        // Aggregated after the loop rather than per fill. Every fill decrements
+        // openYes and openNo by the same amount and raises matched by it, so the
+        // running totals are identical -- but this is three SSTOREs per call
+        // instead of three per matched pair.
         if (filledTotal > 0) {
+            t.openYes -= filledTotal;
+            t.openNo -= filledTotal;
+            t.matched += filledTotal;
             t.cranker = msg.sender;
             emit Matched(tick, filledTotal, t.matched, msg.sender);
         }

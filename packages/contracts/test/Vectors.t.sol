@@ -96,7 +96,7 @@ contract VectorsTest is Test {
         string memory obj = "contractCosts";
         vm.serializeString(obj, "_comment", "Generated from Market.sol by: forge test --mt test_writeVectors");
         vm.serializeString(obj, "_order", "tick asc, then isYes=true then isYes=false, then shareSamples index asc");
-        string memory finalJson = vm.serializeStringArray(obj, "costs", out);
+        string memory finalJson = vm.serializeString(obj, "costs", out);
         vm.writeJson(finalJson, CONTRACT_COSTS);
     }
 

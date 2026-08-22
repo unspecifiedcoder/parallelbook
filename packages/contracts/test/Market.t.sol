@@ -50,7 +50,7 @@ contract MarketTest is Test {
 
     // ------------------------------------------------ the worked example
 
-    /// Alice buys 100 YES @ 0.65 (cost 65). Bob buys 60 NO @ 0.65 (cost 21).
+    // Alice buys 100 YES @ 0.65 (cost 65). Bob buys 60 NO @ 0.65 (cost 21).
     /// 60 shares match. Alice has 40 shares unfilled -> 26 reclaimable.
     function _workedExample() internal {
         vm.prank(alice);
@@ -327,8 +327,16 @@ contract MarketTest is Test {
         assertEq(swept, 0.54 ether);
         assertEq(feeSink.balance, sinkBefore + 0.54 ether);
 
+        // The crank reward goes to the cranker OF RECORD, which is whoever last
+        // did useful matching work -- and in _workedExample that is bob, whose
+        // place() auto-matched the whole pair before the dedicated cranker got
+        // there. The cranker's own matchTick call filled nothing, and a call
+        // that fills nothing does not claim the tick. See
+        // test_crank_reward_goes_to_the_address_that_matched, which asserts the
+        // same rule directly.
         m.payCrankReward(TICK_65);
-        assertEq(m.balance(cranker), 0.06 ether, "cranker earns a slice of the fee");
+        assertEq(m.balance(bob), 0.06 ether, "the address that matched earns the crank slice");
+        assertEq(m.balance(cranker), 0, "an idle cranker earns nothing");
     }
 
     function test_crank_reward_goes_to_the_address_that_matched() public {
