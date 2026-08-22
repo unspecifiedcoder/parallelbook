@@ -30,6 +30,7 @@
 		"test:model": "cd packages/contracts/sim && python3 fuzz.py 400 300",
 		"vectors": "cd packages/contracts && python3 sim/gen_vectors.py && forge test --mt test_writeVectors",
 		"gas": "cd packages/contracts && forge test --gas-report",
+		"hooks:install": "git config core.hooksPath scripts/git-hooks && echo 'hooks installed: scripts/git-hooks'",
 		"typecheck": "npm -w @livemarkets/web run typecheck && npm -w @livemarkets/cranker run typecheck && npm -w @livemarkets/indexer run typecheck"
 	},
 	"devDependencies": {

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#
+# Blocks staged content that looks like a live credential.
+#
+# This exists because .env.local in this repo holds a Supabase service-role key,
+# a Vercel token, three funded private keys and OKX API credentials. Nothing has
+# leaked into git so far -- that was luck plus a .gitignore, and .gitignore only
+# helps for paths anyone remembered to list.
+#
+# Install: npm run hooks:install
+# Bypass (deliberately, for a false positive): git commit --no-verify
+set -uo pipefail
+
+fail=0
+note() { printf '  %s\n' "$1" >&2; }
+
+# 1. No .env file may ever be staged, except the committed template.
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  case "$f" in
+    *.env.example) continue ;;
+    *.env|*.env.*)
+      [ "$fail" -eq 0 ] && echo "pre-commit: refusing this commit" >&2
+      note "env file staged: $f"
+      fail=1
+      ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+# 2. Scan added lines for credential shapes. Added lines only: rewriting history
+#    is out of scope for a commit hook, and scanning the whole file would flag
+#    every pre-existing fixture forever.
+#
+#    A 64-hex private key is deliberately NOT matched bare -- test files are full
+#    of deterministic anvil keys and vectors. It is matched only when assigned to
+#    something that names itself a key.
+added=$(git diff --cached --diff-filter=ACM -U0 | grep -E '^\+' | grep -vE '^\+\+\+' || true)
+[ -z "$added" ] && { [ "$fail" -eq 0 ] && exit 0 || exit 1; }
+
+scan() {
+  local label=$1 pattern=$2
+  local hits
+  hits=$(printf '%s\n' "$added" | grep -nEc "$pattern" || true)
+  if [ "${hits:-0}" -gt 0 ]; then
+    [ "$fail" -eq 0 ] && echo "pre-commit: refusing this commit" >&2
+    note "$label ($hits line(s))"
+    fail=1
+  fi
+}
+
+scan "private key assigned to a KEY/SECRET variable" \
+     '(PRIVATE_KEY|SECRET_KEY|_SECRET|PASSPHRASE)[[:space:]]*[=:][[:space:]]*['"'"'"]?(0x)?[a-fA-F0-9]{32,}'
+scan "OpenAI/OpenRouter-style token (sk-...)"        'sk-[A-Za-z0-9_-]{20,}'
+scan "Groq token (gsk_...)"                          'gsk_[A-Za-z0-9]{20,}'
+scan "Vercel token (vc_...)"                         'vc_[A-Za-z0-9]{20,}'
+scan "GitHub token (ghp_/gho_/ghs_...)"              'gh[pous]_[A-Za-z0-9]{20,}'
+scan "AWS access key id"                             'AKIA[0-9A-Z]{16}'
+scan "JWT / Supabase service key (eyJ...)"           'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}'
+scan "Slack token"                                   'xox[baprs]-[A-Za-z0-9-]{10,}'
+
+if [ "$fail" -ne 0 ]; then
+  note ""
+  note "If this is a false positive: git commit --no-verify"
+  note "If it is not: remove the value, then rotate it. A secret that reached a"
+  note "commit is burned even if you amend the commit away."
+  exit 1
+fi
+exit 0

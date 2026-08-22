@@ -16,10 +16,11 @@ packages/contracts/broadcast/
 # forge-std is committed as plain files so a fresh clone builds without
 # `git submodule update` — do not add lib/ here.
 
-# env: every key in the project is loaded from here and none of it belongs in git
-.env
-.env.local
-.env.*.local
+# env: every key in the project is loaded from here and none of it belongs in git.
+# Ignore every .env variant and allow back only the committed template, so a
+# .env.production or a hurried .env.backup cannot be staged by accident.
+.env*
+!.env.example
 
 # indexer
 apps/indexer/drizzle/meta/_journal.json.bak
