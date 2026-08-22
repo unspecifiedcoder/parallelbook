@@ -54,11 +54,12 @@ function SignIn({ compact }: { compact?: boolean }) {
 			<span className="label num" title={address}>
 				{short}
 			</span>
-			{!compact ? (
-				<button className="btn btn-ghost" onClick={() => logout()}>
-					sign out
-				</button>
-			) : null}
+			{/* Always rendered. AppNav passes compact, and AppNav is on every app
+			    page, so hiding this here meant the app had no sign-out control at
+			    all -- and therefore no way to switch to a different wallet. */}
+			<button className="btn btn-ghost" onClick={() => void logout()}>
+				{compact ? "out" : "sign out"}
+			</button>
 		</span>
 	)
 }
