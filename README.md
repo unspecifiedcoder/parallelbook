@@ -10,8 +10,8 @@ testnet. Nineteen price levels, a real order book, and a livestream next to it.
 ## Run it
 
 ```bash
-git clone https://github.com/ShrikarT/livemarkets
-cd livemarkets
+git clone https://github.com/unspecifiedcoder/parallelbook
+cd parallelbook
 npm i
 npm run dev
 ```
@@ -299,18 +299,37 @@ once.
 
 ## Verification status
 
-Being specific about this rather than implying a green build:
+Being specific about this rather than implying a green build.
 
-| Checked | How |
-| --- | --- |
-| TypeScript across the web app | `npm run typecheck` |
-| Cost / payout / refund parity | `npm test` against contract-generated vectors |
-| Contracts compile and pass | `forge build && forge test` — **run this before deploying** |
-| Parallel-vs-sequential latency | `npx tsx scripts/bench.ts` — **unmeasured until you run it** |
+| Area | State | How to reproduce |
+| --- | --- | --- |
+| Contracts compile | **verified** | `forge build` |
+| Contract test suite | **verified — 51/51** | `forge test` |
+| Solvency invariants | **verified — 6/6, 256 runs × 128 depth** | `forge test --match-path test/Invariant.t.sol` |
+| Cost / payout / refund parity | **verified** against contract-generated vectors | `npm run vectors && forge test` |
+| Python reference model | **verified — 400 markets × 300 actions** | `npm run test:model` |
+| TypeScript across the web app | **not verified** | `npm run typecheck` |
+| `next build` | **not verified** | `npm run build` |
+| Parallel-vs-sequential latency | **unmeasured** | `npx tsx scripts/bench.ts` |
 
-The web app's types are checked. The Solidity has **not** been recompiled since
-the most recent frontend work, because none of that work touched `Market.sol`.
-Run `forge build && forge test` before you deploy anything.
+Two things are worth stating plainly, because an earlier version of this file
+implied the opposite.
+
+**The contracts did not merely go unrecompiled — they did not compile.**
+`_matchTick` overflowed the EVM stack with `via_ir = false`, so no version of
+this test suite had ever run. It runs now, and everything above marked verified
+was verified after that fix, not before it. Three independent checks agree that
+a matched pair is never undercollateralised: the invariant suite, the fuzz test
+in `Vectors.t.sol`, and the Python model, which reports directly that
+`mulDivUp` keeps 1-wei pairs solvent at all nineteen ticks and `mulDivDown`
+does not.
+
+**The web app's types are not checked.** The rows above say `not verified`
+rather than `failing` on purpose: `npm install` has not completed successfully
+in this environment, so the last `tsc` run could not resolve `next` or `viem`
+and its output was mostly module-resolution noise. The genuine type errors
+visible through that noise are fixed; whether more remain behind it is unknown
+until the install succeeds. Do not read `not verified` as `probably fine`.
 
 ---
 

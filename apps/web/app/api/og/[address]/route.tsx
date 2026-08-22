@@ -43,7 +43,7 @@ function sparkline(levels: readonly TickLevel[]): string {
 export async function GET(_req: Request, ctx: { params: Promise<{ address: string }> }) {
 	const { address } = await ctx.params
 
-	let question = brand.headline
+	let question: string = brand.headline
 	let implied = "0.50"
 	let spark = "\u00b7".repeat(19)
 	let volume = "0"

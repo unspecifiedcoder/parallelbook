@@ -349,7 +349,7 @@ function AdminInner() {
 												) : null}
 											</div>
 
-											{target?.address === r.snap.address ? (
+											{target && target.address === r.snap.address ? (
 												<div className="panel" style={{ borderColor: "var(--no)" }}>
 													<div className="panel-body" style={{ display: "grid", gap: "var(--s2)" }}>
 														<span className="label">

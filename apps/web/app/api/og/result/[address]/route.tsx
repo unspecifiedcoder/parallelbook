@@ -35,12 +35,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ address: string
 	const whoParam = new URL(req.url).searchParams.get("who")
 	const who = whoParam && isAddress(whoParam) ? (whoParam as Address) : null
 
-	let question = brand.headline
+	let question: string = brand.headline
 	let headline = "\u2014"
-	let caption = brand.tagline
+	let caption: string = brand.tagline
 	let badge = "RESULT"
 	let accent = ULTRA
-	let footer = brand.tagline
+	let footer: string = brand.tagline
 
 	if (isAddress(address)) {
 		try {
