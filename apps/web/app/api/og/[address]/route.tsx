@@ -18,9 +18,7 @@ import { formatBps, formatWad, type TickLevel } from "../../../../lib/market-mat
  */
 
 export const runtime = "edge"
-export const alt = "Live market"
-export const size = { width: 1200, height: 630 }
-export const contentType = "image/png"
+const size = { width: 1200, height: 630 }
 
 const PAPER = "#F2EFE6"
 const INK = "#0B0B0C"

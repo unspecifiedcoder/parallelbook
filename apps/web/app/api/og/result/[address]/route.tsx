@@ -20,9 +20,7 @@ import { settlementOf } from "../../../../../lib/settlement"
  */
 
 export const runtime = "edge"
-export const alt = "Market result"
-export const size = { width: 1200, height: 630 }
-export const contentType = "image/png"
+const size = { width: 1200, height: 630 }
 
 const PAPER = "#F2EFE6"
 const INK = "#0B0B0C"
