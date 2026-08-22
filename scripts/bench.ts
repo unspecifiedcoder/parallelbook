@@ -192,12 +192,13 @@ async function freshMarket(label: string): Promise<Address> {
  * crossable and both benchmarks do exactly the same work.
  */
 async function seed(target: Address, abi: typeof marketAbi | typeof naiveAbi): Promise<number> {
-	const base = await pub.getTransactionCount({ address: account.address, blockTag: "pending" })
-	const sends: Promise<Hex>[] = []
-	let n = base
+	// Thunks, not promises. Calling writeContract eagerly starts the request, so
+	// building an array of promises fires all 38 at once no matter how they are
+	// awaited afterwards -- which is what Monad's mempool rejects.
+	const sends: Array<() => Promise<Hex>> = []
 	for (let tick = 0; tick < NUM_TICKS; tick++) {
 		for (const isYes of [true, false]) {
-			sends.push(
+			sends.push(() =>
 				wallet.writeContract({
 					chain,
 					account,
@@ -206,13 +207,34 @@ async function seed(target: Address, abi: typeof marketAbi | typeof naiveAbi): P
 					functionName: "place",
 					args: [tick, SHARES, isYes],
 					value: cost(tick, SHARES, isYes),
-					nonce: n++,
+					// No explicit nonce. Seeding is paced, so a nonce computed up front
+					// is stale by the time the later batches send; viem fetching it per
+					// send is correct and costs nothing here. The measured sections DO
+					// pre-compute nonces, because firing nineteen at once is the point.
 				}),
 			)
 		}
 	}
-	const hashes = await Promise.all(sends)
-	await Promise.all(hashes.map((hash) => pub.waitForTransactionReceipt({ hash })))
+	// Seeding is SETUP, not the measurement, so it does not need to be parallel --
+	// and firing all 38 places at once is rejected by Monad's mempool with "an
+	// existing transaction had higher priority", which killed every run of this
+	// script. Batching keeps the queue shallow enough to be accepted. The measured
+	// sections below are untouched and still fire all nineteen ticks at once.
+	// The public endpoint rate-limits at 429 well before the mempool complains, so
+	// seeding is paced. Only setup pays this cost; the measured sections still fire
+	// all nineteen ticks simultaneously, which is the entire point of the exercise.
+	// One at a time. Without an explicit nonce, two concurrent sends fetch the same
+	// pending nonce and collide; with an explicit nonce, pacing makes it stale.
+	// Sequential sidesteps both, and seeding is setup rather than the measurement.
+	const BATCH = 1
+	const PAUSE_MS = 250
+	const hashes: Hex[] = []
+	for (let i = 0; i < sends.length; i += BATCH) {
+		const chunk = await Promise.all(sends.slice(i, i + BATCH).map((send) => send()))
+		await Promise.all(chunk.map((hash) => pub.waitForTransactionReceipt({ hash })))
+		hashes.push(...chunk)
+		if (i + BATCH < sends.length) await new Promise((r) => setTimeout(r, PAUSE_MS))
+	}
 	return hashes.length
 }
 
