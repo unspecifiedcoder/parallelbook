@@ -1,8 +1,11 @@
 {
-  "_note": "Written by `forge script script/Deploy.s.sol` and committed on purpose: addresses belong in a reviewable diff, not in a dashboard env var. Regenerate with `npm run deploy` after every deployment. The zero addresses below are the fresh-clone state - the app renders an empty-state until this file points at a real deployment.",
   "chainId": 10143,
-  "factory": "0x0000000000000000000000000000000000000000",
-  "naiveBook": "0x0000000000000000000000000000000000000000",
-  "resolver": "0x0000000000000000000000000000000000000000",
-  "series": []
+  "factory": "0xBa9876Fd1c8cb6bB53a91D594B2FD6E1fdbeB74A",
+  "naiveBook": "0x65f5f4b3743feebFAfa4ED007266B0cB6FBC91E9",
+  "resolver": "0x72db032c0dFB6E7502e16A73fabdab31712dc706",
+  "series": [
+    { "address": "0xf08dEbb649398Ecd2D4D808b172e2B26C09378EE", "question": "Boundary this over?" },
+    { "address": "0xF88a19D58C4470692e760D39238d61BB3A979eDE", "question": "Does the CT side win this round?" },
+    { "address": "0xc0B429F4054f61B5e6AB8Cb648Dcd0E80fd1cB72", "question": "Next block above 2M gas?" }
+  ]
 }
