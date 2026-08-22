@@ -110,8 +110,13 @@ export function DepthLadder({
 	// hidden, or the cancel affordance would vanish exactly when it is needed.
 	const visible: number[] = []
 	for (let t = 0; t < Math.min(NUM_TICKS, levels.length); t++) {
+		// The loop bound already proves this index is in range, but
+		// noUncheckedIndexedAccess types every element access as possibly
+		// undefined, so bind it once and let the guard do the narrowing.
+		const level = levels[t]
+		if (!level) continue
 		const mine = (mineYes?.[t] ?? 0n) > 0n || (mineNo?.[t] ?? 0n) > 0n
-		const busy = levels[t].openYes > 0n || levels[t].openNo > 0n || levels[t].matched > 0n
+		const busy = level.openYes > 0n || level.openNo > 0n || level.matched > 0n
 		if (mine || busy || Math.abs(t - nearest) <= 4 || t === selectedTick) visible.push(t)
 	}
 

@@ -101,7 +101,11 @@ export async function getStreamMetas(
 	const out = new Map<string, StreamMeta>()
 	const settled = await Promise.allSettled(markets.map((m) => getStreamMeta(m)))
 	settled.forEach((s, i) => {
-		if (s.status === "fulfilled" && s.value) out.set(markets[i].address.toLowerCase(), s.value)
+		// allSettled preserves order and length, so markets[i] is always present --
+		// but noUncheckedIndexedAccess cannot know that, so narrow it explicitly.
+		const m = markets[i]
+		if (!m) return
+		if (s.status === "fulfilled" && s.value) out.set(m.address.toLowerCase(), s.value)
 	})
 	return out
 }
