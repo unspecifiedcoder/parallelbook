@@ -5,6 +5,36 @@
 A prediction market that opens, fills and settles inside a minute, on Monad
 testnet. Nineteen price levels, a real order book, and a livestream next to it.
 
+Most order books are one queue behind one lock. This one is nineteen independent
+shards, one per price level, and no state-changing function touches more than a
+single shard plus the caller's own slots. Two trades at different prices share no
+storage, so Monad's parallel executor can run them at the same time instead of
+single-filing them. That is the whole bet, and it is the reason the contract is
+shaped the way it is: there is deliberately **no global counter, no aggregate
+total, nothing written on a hot path that every order would have to queue behind.**
+
+### Live on Monad testnet
+
+Deployed and verified onchain — not a diagram, not a localhost screenshot.
+
+| Contract | Address |
+| --- | --- |
+| MarketFactory | [`0xBa9876Fd…eB74A`](https://testnet.monadexplorer.com/address/0xBa9876Fd1c8cb6bB53a91D594B2FD6E1fdbeB74A) |
+| NaiveBook (benchmark baseline) | [`0x65f5f4b3…C91E9`](https://testnet.monadexplorer.com/address/0x65f5f4b3743feebFAfa4ED007266B0cB6FBC91E9) |
+| Series — "Boundary this over?" | [`0xf08dEbb6…78EE`](https://testnet.monadexplorer.com/address/0xf08dEbb649398Ecd2D4D808b172e2B26C09378EE) |
+| Series — "Does the CT side win this round?" | [`0xF88a19D5…9eDE`](https://testnet.monadexplorer.com/address/0xF88a19D58C4470692e760D39238d61BB3A979eDE) |
+| Series — "Next block above 2M gas?" | [`0xc0B429F4…cB72`](https://testnet.monadexplorer.com/address/0xc0B429F4054f61B5e6AB8Cb648Dcd0E80fd1cB72) |
+
+Chain id `10143`. Addresses live in `packages/contracts/deployments/10143.json`,
+committed on purpose: an address belongs in a reviewable diff, not in a dashboard
+env var. `NaiveBook` is deployed next to the real one so the parallel-vs-sequential
+benchmark measures two contracts on the same chain at the same gas price, rather
+than measuring a claim.
+
+**Test funds only.** The resolver is the deployer — the honest centralisation
+this project documents rather than hides, acceptable on a testnet demo and
+nowhere else.
+
 ---
 
 ## Run it
@@ -308,6 +338,7 @@ Being specific about this rather than implying a green build.
 | Solvency invariants | **verified — 6/6, 256 runs × 128 depth** | `forge test --match-path test/Invariant.t.sol` |
 | Cost / payout / refund parity | **verified** against contract-generated vectors | `npm run vectors && forge test` |
 | Python reference model | **verified — 400 markets × 300 actions** | `npm run test:model` |
+| Deployed to Monad testnet | **verified onchain** — bytecode present, `seriesCount() == 3`, round 0 answers | `cast code <factory> --rpc-url https://testnet-rpc.monad.xyz` |
 | TypeScript across the web app | **not verified** | `npm run typecheck` |
 | `next build` | **not verified** | `npm run build` |
 | Parallel-vs-sequential latency | **unmeasured** | `npx tsx scripts/bench.ts` |
