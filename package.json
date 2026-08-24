@@ -10,6 +10,7 @@
 	},
 	"workspaces": [
 		"packages/shared",
+		"packages/width",
 		"apps/web",
 		"apps/cranker",
 		"apps/indexer"
@@ -24,10 +25,11 @@
 		"index": "npm -w @livemarkets/indexer run start",
 		"index:push": "npm -w @livemarkets/indexer run push",
 		"bench": "tsx --env-file-if-exists=.env scripts/bench.ts",
-		"test": "npm run test:contracts && npm run test:math && npm run test:model",
+		"test": "npm run test:contracts && npm run test:math && npm run test:width && npm run test:model",
 		"test:contracts": "cd packages/contracts && forge test -vv",
 		"test:math": "cd apps/web && node --test lib/market-math.test.ts",
 		"test:model": "cd packages/contracts/sim && python3 fuzz.py 400 300",
+		"test:width": "npm -w @livemarkets/width run test",
 		"vectors": "cd packages/contracts && python3 sim/gen_vectors.py && forge test --mt test_writeVectors",
 		"gas": "cd packages/contracts && forge test --gas-report",
 		"hooks:install": "git config core.hooksPath scripts/git-hooks && echo 'hooks installed: scripts/git-hooks'",
