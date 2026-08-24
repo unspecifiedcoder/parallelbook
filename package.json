@@ -25,7 +25,7 @@
 		"index": "npm -w @livemarkets/indexer run start",
 		"index:push": "npm -w @livemarkets/indexer run push",
 		"bench": "tsx --env-file-if-exists=.env scripts/bench.ts",
-		"test": "npm run test:contracts && npm run test:math && npm run test:model",
+		"test": "npm run test:contracts && npm run test:math && npm run test:width && npm run test:model",
 		"test:contracts": "cd packages/contracts && forge test -vv",
 		"test:math": "cd apps/web && node --test lib/market-math.test.ts",
 		"test:model": "cd packages/contracts/sim && python3 fuzz.py 400 300",
