@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { accessSetFromTraces, storageSlots } from "./trace.ts"
+import { accessSetFromTraces, requirePost, requireTouched, storageSlots } from "./trace.ts"
 
 // Captured from anvil on 2026-08-24, NaiveBook.place(3, 1e18, true).
 // diffMode:false returns everything TOUCHED; diffMode:true returns, under `post`,
@@ -54,4 +54,46 @@ test("a written slot that was never reported as touched still counts as a write"
 	const a = accessSetFromTraces("0x1", "0x2", {}, WRITTEN)
 	assert.equal(a.writes.size, 2)
 	assert.equal(a.reads.size, 0)
+})
+
+// C1(a): prestateTracer's diffMode:true reports the NET diff. A reverted
+// transaction leaves no trace in `post` even though it touched every slot on
+// TOUCHED's list -- so a revert must be classified from the receipt, not the diff.
+test("a reverted transaction counts every touched slot as a write, and reads nothing", () => {
+	const a = accessSetFromTraces("0xdead", "0xF39Fd6", TOUCHED, WRITTEN, true)
+	assert.equal(a.reverted, true)
+	assert.equal(a.reads.size, 0)
+	assert.equal(a.writes.size, 3)
+	for (const s of storageSlots(TOUCHED)) assert.ok(a.writes.has(s))
+})
+
+test("a non-reverted transaction keeps the touched-minus-written derivation", () => {
+	const a = accessSetFromTraces("0xdead", "0xF39Fd6", TOUCHED, WRITTEN, false)
+	assert.equal(a.reverted, false)
+	assert.equal(a.writes.size, 2)
+	assert.equal(a.reads.size, 1)
+})
+
+// C2: an endpoint that serves prestateTracer but ignores tracerConfig.diffMode
+// must not be allowed to silently report maximal width for a block it never
+// actually measured.
+test("requirePost throws when the diffMode:true response has no post", () => {
+	assert.throws(() => requirePost(undefined, "http://x"), /diffMode/)
+	assert.throws(() => requirePost(null, "http://x"), /diffMode/)
+	assert.throws(() => requirePost({}, "http://x"), /diffMode/)
+	assert.throws(() => requirePost({ pre: {} }, "http://x"), /diffMode/)
+})
+
+test("requirePost accepts a response that has a post, even an empty one", () => {
+	assert.deepEqual(requirePost({ post: {} }, "http://x"), {})
+	assert.deepEqual(requirePost({ post: WRITTEN }, "http://x"), WRITTEN)
+})
+
+test("requireTouched throws when the diffMode:false response is null or undefined", () => {
+	assert.throws(() => requireTouched(null, "http://x"), /diffMode/)
+	assert.throws(() => requireTouched(undefined, "http://x"), /diffMode/)
+})
+
+test("requireTouched accepts an empty object", () => {
+	assert.deepEqual(requireTouched({}, "http://x"), {})
 })
