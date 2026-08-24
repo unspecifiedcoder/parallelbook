@@ -1,0 +1,11 @@
+{
+	"name": "@livemarkets/width",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Measures whether a contract is actually parallel.",
+	"bin": { "width": "./src/cli.ts" },
+	"scripts": {
+		"test": "node --test src/**/*.test.ts"
+	}
+}
