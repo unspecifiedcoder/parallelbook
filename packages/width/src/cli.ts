@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs"
+import { pathToFileURL } from "node:url"
+
 import { analyse, formatReport } from "./report.ts"
 import { accessSetsForBlock } from "./trace.ts"
 
@@ -49,6 +52,22 @@ export async function main(argv: string[]): Promise<number> {
 	}
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+/**
+ * npm installs bin.width as a SYMLINK. Node sets process.argv[1] to the
+ * symlink path but import.meta.url to the REALPATH, so a naive
+ * `file://${argv[1]}` comparison is always false for the installed binary
+ * and the CLI silently no-ops with exit code 0. Resolve argv[1] through the
+ * symlink before comparing.
+ */
+export function isMainModule(argv1: string | undefined, moduleUrl: string): boolean {
+	if (!argv1) return false
+	try {
+		return pathToFileURL(realpathSync(argv1)).href === moduleUrl
+	} catch {
+		return false
+	}
+}
+
+if (isMainModule(process.argv[1], import.meta.url)) {
 	process.exit(await main(process.argv.slice(2)))
 }
