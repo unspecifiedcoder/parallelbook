@@ -47,7 +47,9 @@ Three layers, each independently testable.
 ### 1. Core — pure, no I/O
 
 ```
-colour(accesses: AccessSet[]) -> { rounds, width, roundOf }
+colour(accesses: AccessSet[])            -> { rounds, width, roundOf }   // order-free
+criticalPath(accesses: AccessSet[])      -> { rounds, roundOf }          // order-dependent
+reorder(accesses: AccessSet[])           -> AccessSet[]                  // nonce-preserving
 
 // roundOf maps each tx id to its colour, so a caller can show WHICH
 // transactions were forced apart rather than only how many rounds there were.
@@ -105,6 +107,60 @@ so it will never be the surface most people touch.
 
 The CI gate is where recurring value lives: width is invisible until mainnet, which
 is precisely what makes it worth a regression test.
+
+## Ordering: what the chain actually did, versus what it could have done
+
+A spike into Monad's execution layer on 2026-08-24 changed this section's shape.
+
+Monad executes **optimistically in the block's linear order** and never reorders:
+blocks are "a linearly ordered set of transactions" and the result is identical to
+sequential execution. Conflict detection is purely optimistic — no access lists, no
+prediction — and it is **reactive**: "one doesn't detect that a transaction needs to
+be executed again until earlier transactions in the block have completed." The
+leader picks the order "as they see fit", defaulting to descending fee-per-gas.
+
+That default is **conflict-blind**. Two transactions that fight over one slot end up
+adjacent or far apart purely by coincidence of fee. So there is real headroom, and
+measuring it is a milestone 1 feature rather than a separate product.
+
+This forces a distinction the tool must not blur:
+
+| metric | order-dependent? | meaning |
+| --- | --- | --- |
+| `stateWidth` | no | graph colouring; the ceiling any scheduler could reach |
+| `effectiveWidth` | no | as above, plus the same-sender nonce constraint |
+| `realizedRounds` | **yes** | what the chain actually did, in the order it actually used |
+| `reorderedRounds` | **yes** | the same transactions under a conflict-aware ordering |
+
+`realizedRounds` is computed as the **critical path** through the DAG that orders
+conflicts by position: draw an edge `j -> i` whenever `j` precedes `i` and the two
+conflict, then `round(i) = 1 + max(round(j))` over that transaction's predecessors.
+Graph colouring cannot produce this number, because colouring is a property of the
+undirected graph and throws the order away. Reporting only a colour count would
+describe a block the chain never executed.
+
+Worth stating that ordering genuinely matters and is not an artefact: with `A-B` and
+`B-C` conflicting but `A-C` independent, the order `[A,B,C]` needs three rounds
+while `[A,C,B]` needs two. Same transactions, same conflicts, different cost.
+
+**Headroom** is then `realizedRounds / reorderedRounds` — a measured claim of the
+form *"this block executed in 12 rounds; ordered differently the same transactions
+needed 3."*
+
+### Two honesty constraints on the reordering
+
+1. **Reordering changes outcomes.** Swapping two conflicting transactions changes
+   what they do — that is what MEV is. This is legitimate (the leader may pick any
+   order, and no rule is broken) but it is **not a free optimisation**, and the
+   output must say so. Presenting headroom as free throughput would be precisely
+   the class of over-claim this project exists to catch.
+2. **Same-sender transactions may not be reordered relative to each other.** Account
+   nonces are strictly ordered, so any candidate ordering that permutes one sender's
+   transactions is invalid and must be rejected rather than scored.
+
+Finding a minimum-round ordering is NP-hard, so `reorderedRounds` comes from a
+heuristic and is an **upper bound** on the achievable round count — meaning reported
+headroom is conservative, in the same direction as every other number here.
 
 ## Correctness decisions
 
@@ -165,7 +221,8 @@ later milestones are recorded here so the boundaries are deliberate, and each ge
 its own plan when it is reached.
 
 1. **Core + trace adapter + `width block`.** Reproduces every fixture above against
-   local anvil. This is the milestone that proves the thesis.
+   local anvil, and reports all four metrics including headroom. This is the
+   milestone that proves the thesis.
 2. **Real chain.** Point at Monad. Needs a trace-enabled endpoint — the public one
    rate-limits well before a block range finishes.
 3. **CI gate.** `width check`, plus a GitHub Action.
@@ -182,5 +239,15 @@ its own plan when it is reached.
 - **Adoption.** A measurement nobody is required to look at gets looked at by
   nobody. The CI gate is the answer, which is why it is milestone 3 rather than a
   later nice-to-have.
+- **Headroom may be small.** If real blocks reorder to roughly the same round
+  count, conflict-aware scheduling was never worth pursuing. That is a cheap
+  negative result to buy here and an expensive one to discover after building a
+  scheduler, which is the reason this is a milestone 1 feature.
+- **Scheduling is not a product on Monad.** The same spike found no builder market
+  and no builder API — leaders build from local mempools — and conflict-aware
+  ordering produces throughput for the network rather than revenue for the orderer,
+  unlike MEV. The analysis below is therefore scoped as evidence, not as the first
+  step of a scheduling business. L2 sequencers, where one operator owns ordering and
+  captures the throughput, are the structure that would change this.
 - **The finding may be unwelcome.** If most contracts on a chain score 1.00×, that
   is a true result about that chain. Publishing it is the point.
