@@ -19,7 +19,12 @@ export function analyse(accesses: AccessSet[]): WidthReport {
 	const stateRounds = colour(accesses).rounds
 	const effectiveRounds = colour(accesses, conflictsWithNonce).rounds
 	const realizedRounds = criticalPath(accesses).rounds
-	const reorderedRounds = criticalPath(reorder(accesses)).rounds
+	// reorder()'s per-sender layer floor can push a transaction past a layer it
+	// did not need, which can make criticalPath(reorder(accesses)) WORSE than
+	// the original order (I3; confirmed by property testing over 200,000 random
+	// workloads). The original order is always itself a valid nonce-preserving
+	// candidate, so clamping to it is sound and can never over-claim.
+	const reorderedRounds = Math.min(realizedRounds, criticalPath(reorder(accesses)).rounds)
 
 	return {
 		txs: n,

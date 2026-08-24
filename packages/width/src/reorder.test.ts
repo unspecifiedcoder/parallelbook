@@ -59,7 +59,13 @@ test("noncePreserved catches a permutation that violates a sender's order", () =
 	assert.equal(noncePreserved(txs, [txs[1]!, txs[0]!]), false)
 })
 
-test("reordering never increases the round count", () => {
+test("reordering does not increase the round count on this workload (not a general guarantee)", () => {
+	// The per-sender layer floor can push a transaction past a layer it did not
+	// need, and 200,000-case property testing found real counterexamples where
+	// criticalPath(reorder(txs)) > criticalPath(txs). This workload happens not
+	// to trigger that, but the property does not hold in general -- report.ts
+	// is what clamps reorderedRounds so a report can never claim negative
+	// headroom from it (see report.test.ts).
 	const txs = [
 		tx("a", "0x1", ["s:0"]),
 		tx("b", "0x2", ["s:1"]),
@@ -70,4 +76,24 @@ test("reordering never increases the round count", () => {
 	const before = criticalPath(txs).rounds
 	const after = criticalPath(reorder(txs)).rounds
 	assert.ok(after <= before, `reorder made it worse: ${before} -> ${after}`)
+})
+
+test("a real counterexample: reorder's per-sender floor CAN increase the round count", () => {
+	// Found by brute-force search over criticalPath(reorder(txs)) vs criticalPath(txs).
+	// This is exactly the phenomenon I3 clamps in report.ts -- reorder.ts itself
+	// makes no promise that headroom is never negative.
+	const txs = [
+		tx("t0", "0x0", ["s:0", "s:1"]),
+		tx("t1", "0x1", ["s:3", "s:0"]),
+		tx("t2", "0x0", ["s:2", "s:4"]),
+		tx("t3", "0x2", ["s:2"]),
+		tx("t4", "0x0", ["s:1", "s:4"]),
+		tx("t5", "0x0", ["s:2"]),
+		tx("t6", "0x1", ["s:4"]),
+	]
+	const before = criticalPath(txs).rounds
+	const after = criticalPath(reorder(txs)).rounds
+	assert.equal(before, 3)
+	assert.equal(after, 4)
+	assert.ok(after > before, "this case is supposed to demonstrate the increase")
 })
