@@ -7,11 +7,12 @@ import type { AccessSet, WidthReport } from "./types.ts"
 /** Printed with every report. A number that describes its own limits is more
  *  useful than a bigger number that does not. */
 export const LIMITATIONS = [
+	"UPWARD bias: an SSTORE that writes a slot's EXISTING value is invisible to prestateTracer -- pre equals post, so it never appears in the diff -- and is counted as a read. Contracts that rewrite unchanged values score too high.",
+	"UPWARD bias: account balances and nonces are excluded from conflicts (necessary -- every transaction pays the same fee recipient, and counting balances would make everything conflict). Native-value transfers sharing a recipient look disjoint here even though a real scheduler would serialise them on that recipient's balance.",
+	"DOWNWARD bias: greedy colouring and heuristic reordering both under-report, since optimal colouring and optimal ordering are both NP-hard.",
 	"width is a ceiling, not a speedup: it converts to latency only once execution, rather than block time or consensus, is the binding constraint",
 	"measured traffic is not possible traffic: a quiet block scores as parallel even for a contract that would collapse under load",
-	"greedy colouring and heuristic reordering both under-report, so these numbers are conservative",
 	"reordering changes outcomes: a reordered block is a different block, so headroom is not free throughput",
-	"account balances and nonces are excluded from conflicts; only storage slots count",
 ]
 
 export function analyse(accesses: AccessSet[]): WidthReport {

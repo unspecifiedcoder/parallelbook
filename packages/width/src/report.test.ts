@@ -76,3 +76,38 @@ test("every report carries its limitations, and the output prints them", () => {
 	const text = formatReport(r)
 	for (const line of LIMITATIONS) assert.ok(text.includes(line), `missing: ${line}`)
 })
+
+test("every limitation prints in the JSON output too", () => {
+	const r = analyse([tx("a", "0x1", ["c:1"])])
+	const json = JSON.stringify(r, null, 2)
+	for (const line of LIMITATIONS) assert.ok(json.includes(line), `missing from JSON: ${line}`)
+})
+
+// I5: the old blanket claim ("these numbers are conservative") is false --
+// C1(b) and the balance exclusion are both upward biases. Each limitation
+// must now name its own direction, explicitly, so the reader is not misled
+// into thinking every source of error pushes the same way.
+test("limitations name their direction: upward biases are labelled UPWARD, not folded into a blanket conservatism claim", () => {
+	const upward = LIMITATIONS.filter((l) => /UPWARD/.test(l))
+	assert.ok(upward.length >= 2, "expected at least the SSTORE-unchanged-value bias and the balance-exclusion bias")
+	assert.ok(
+		upward.some((l) => /existing value/i.test(l) && /prestateTracer/i.test(l)),
+		"missing the SSTORE-writes-existing-value upward bias",
+	)
+	assert.ok(
+		upward.some((l) => /balance/i.test(l) && /recipient/i.test(l)),
+		"missing the shared-recipient balance-exclusion upward bias",
+	)
+})
+
+test("downward biases are labelled DOWNWARD", () => {
+	const downward = LIMITATIONS.filter((l) => /DOWNWARD/.test(l))
+	assert.ok(
+		downward.some((l) => /colouring/i.test(l) && /reorder/i.test(l)),
+		"missing the greedy-colouring / heuristic-reordering downward bias",
+	)
+})
+
+test("the old blanket conservatism claim is gone", () => {
+	for (const l of LIMITATIONS) assert.ok(!/these numbers are conservative/i.test(l))
+})
