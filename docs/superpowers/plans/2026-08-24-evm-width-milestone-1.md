@@ -1291,7 +1291,7 @@ contract ExportAccessesTest is ConflictHarness {
         vm.writeFile("./test/accesses/matchtick-19.json", arr);
     }
 
-    function _slots(address who, bytes32[] memory ss) internal pure returns (string memory out) {
+    function _slots(address who, bytes32[] memory ss) internal view returns (string memory out) {
         for (uint256 i; i < ss.length; ++i) {
             out = string.concat(out, '"', vm.toString(who), ":", vm.toString(ss[i]), '"');
             if (i + 1 < ss.length) out = string.concat(out, ",");
