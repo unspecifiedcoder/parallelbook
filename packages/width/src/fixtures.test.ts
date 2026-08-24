@@ -6,6 +6,7 @@ import type { AccessSet } from "./types.ts"
 
 const MARKET = "0xmarket"
 const NAIVE = "0xnaive"
+const FLASHGRID = "0xflashgrid"
 const TICKS = 19
 
 function set(sender: string, id: string, reads: string[], writes: string[]): AccessSet {
@@ -37,6 +38,31 @@ function marketPlace(t: number, sender: string): AccessSet {
 	return set(sender, `place-${t}-${sender}`, [`${MARKET}:tick-${t}-book`], [
 		`${MARKET}:tick-${t}-open`,
 		`${MARKET}:bal-${sender}`,
+	])
+}
+
+/** Result 4 (docs/PARALLELISM.md): market.matchTick keeps positions keyed by
+ *  tick AND maker -- yesPos[tick][maker] -- so a single maker quoting across
+ *  every tick still writes a DIFFERENT slot per tick, and ticks stay disjoint.
+ *  This is the whole contrast against flashgrid.settleTick below, which keys
+ *  its balance write by maker alone. */
+function matchTickByMaker(t: number, cranker: string, maker: string): AccessSet {
+	return set(cranker, `match-mk-${t}`, [`${MARKET}:tick-${t}-book`], [
+		`${MARKET}:tick-${t}-open`,
+		`${MARKET}:tick-${t}-matched`,
+		`${MARKET}:pos-${t}-${maker}`,
+	])
+}
+
+/** Result 4 (docs/PARALLELISM.md): flashgrid.settleTick writes the tick's own
+ *  shard plus balances[order.maker], keyed by maker ONLY -- not by tick. Two
+ *  ticks can settle concurrently only if no trader appears as maker in both,
+ *  so a single market maker quoting across the book collapses every tick's
+ *  settlement to fully serial. */
+function settleTick(t: number, keeper: string, maker: string): AccessSet {
+	return set(keeper, `settle-${t}`, [], [
+		`${FLASHGRID}:tick-${t}-settled`,
+		`${FLASHGRID}:balances-${maker}`,
 	])
 }
 
@@ -82,6 +108,37 @@ test("PARALLELISM.md: contention curve, 19 txs over a shrinking spread", () => {
 		const txs = Array.from({ length: TICKS }, (_, i) => matchTick(i % spread, `0xcranker${i}`))
 		assert.equal(analyse(txs).realizedRounds, rounds, `spread ${spread}`)
 	}
+})
+
+// Result 4 -- these are the ONLY rows that exercise the discriminating property
+// the project's argument rests on: sharding that survives a shared counterparty
+// versus sharding that does not. DO NOT edit docs/PARALLELISM.md; it is the oracle.
+
+test("PARALLELISM.md: flashgrid.settleTick with disjoint makers is width 19.00x", () => {
+	const txs = Array.from({ length: TICKS }, (_, t) => settleTick(t, `0xkeeper${t}`, `0xmaker${t}`))
+	const r = analyse(txs)
+	assert.equal(r.stateWidth, 19)
+	assert.equal(r.realizedRounds, 1)
+})
+
+test("PARALLELISM.md: flashgrid.settleTick with ONE shared maker collapses to width 1.00x", () => {
+	// balances[maker] is keyed by maker alone, so a trader quoting across the
+	// book reserialises every tick's settlement -- exactly the property that
+	// makes FlashGrid's sharding conditional rather than real.
+	const txs = Array.from({ length: TICKS }, (_, t) => settleTick(t, `0xkeeper${t}`, "0xsharedmaker"))
+	const r = analyse(txs)
+	assert.equal(r.stateWidth, 1)
+	assert.equal(r.realizedRounds, 19)
+})
+
+test("PARALLELISM.md: market.matchTick with one shared maker stays width 19.00x", () => {
+	// positions are keyed by tick AND maker, so they stay disjoint even under a
+	// single shared maker -- the contrast with settleTick above is the whole
+	// reason to keep this design over FlashGrid's.
+	const txs = Array.from({ length: TICKS }, (_, t) => matchTickByMaker(t, `0xcranker${t}`, "0xsharedmaker"))
+	const r = analyse(txs)
+	assert.equal(r.stateWidth, 19)
+	assert.equal(r.realizedRounds, 1)
 })
 
 test("effectiveWidth catches a disjoint workload sent from one key", () => {
