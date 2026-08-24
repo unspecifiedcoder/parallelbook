@@ -35,6 +35,14 @@ done < <(git diff --cached --name-only --diff-filter=ACM)
 #    of deterministic anvil keys and vectors. It is matched only when assigned to
 #    something that names itself a key.
 added=$(git diff --cached --diff-filter=ACM -U0 | grep -E '^\+' | grep -vE '^\+\+\+' || true)
+
+#    One narrow allowlist: anvil's account #0 key, printed by `anvil` on every
+#    boot and in Foundry's own documentation. It funds local benchmark runs so a
+#    local run needs no configuration. It guards nothing, and treating it as a
+#    secret only trains people to pass --no-verify, which is the real risk. This
+#    is an exact-string exemption, not a relaxed pattern.
+ANVIL_KEY_0=ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+added=$(printf '%s\n' "$added" | sed "s/$ANVIL_KEY_0/<anvil-account-0>/g")
 [ -z "$added" ] && { [ "$fail" -eq 0 ] && exit 0 || exit 1; }
 
 scan() {

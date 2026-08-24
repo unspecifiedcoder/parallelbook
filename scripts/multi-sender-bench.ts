@@ -29,6 +29,13 @@
  * longer to confirm, that is the scheduler re-executing conflicts. Reported honestly
  * below rather than dressed up.
  *
+ * ANVIL. BENCH_CHAIN_ID=31337 runs the whole thing locally for free, and that is
+ * worth doing -- but not for the headline number. Anvil executes SEQUENTIALLY, so
+ * arms A and B are identical there BY CONSTRUCTION and any gap between them is
+ * noise. What a local run does buy: it exercises every code path end to end, it
+ * proves all three arms produce the same fills, and it reports exact gas -- all
+ * without spending testnet MON. Debug here, measure on a parallel node.
+ *
  * Run:  npx tsx scripts/multi-sender-bench.ts
  * Env:  MONAD_RPC_URL   private endpoint STRONGLY recommended; the public one
  *                       rate-limits (429) well before this finishes
@@ -55,13 +62,15 @@ import { privateKeyToAccount } from "viem/accounts"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, "..")
+const CHAIN_ID = Number(process.env.BENCH_CHAIN_ID ?? 10143)
+const LOCAL = CHAIN_ID === 31337
 const deployment = JSON.parse(
 	await import("node:fs/promises").then((fs) =>
-		fs.readFile(join(root, "packages/contracts/deployments/10143.json"), "utf8"),
+		fs.readFile(join(root, `packages/contracts/deployments/${CHAIN_ID}.json`), "utf8"),
 	),
 ) as { factory: Address; naiveBook: Address }
 
-const RPC = process.env.MONAD_RPC_URL ?? "https://testnet-rpc.monad.xyz"
+const RPC = process.env.MONAD_RPC_URL ?? (LOCAL ? "http://127.0.0.1:8545" : "https://testnet-rpc.monad.xyz")
 const SENDERS = Number(process.env.BENCH_SENDERS ?? 19)
 const RUNS = Number(process.env.BENCH_RUNS ?? 5)
 // Near MIN_SHARES (1e15). The benchmark measures scheduling, not size: a full
@@ -71,9 +80,9 @@ const SHARES = 2n * 10n ** 15n
 const ONE = 10_000n
 
 const chain = defineChain({
-	id: 10143,
-	name: "Monad Testnet",
-	nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+	id: CHAIN_ID,
+	name: LOCAL ? "Anvil" : "Monad Testnet",
+	nativeCurrency: { name: LOCAL ? "Ether" : "Monad", symbol: LOCAL ? "ETH" : "MON", decimals: 18 },
 	rpcUrls: { default: { http: [RPC] } },
 	testnet: true,
 })
@@ -131,6 +140,8 @@ const factoryAbi = [
 
 function fundingKey(): Hex {
 	const k = process.env.BENCH_PRIVATE_KEY ?? process.env.DEPLOYER_PRIVATE_KEY ?? process.env.PRIVATE_KEY
+	// anvil's first prefunded account, so a local run needs no configuration at all
+	if (!k && LOCAL) return "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as Hex
 	if (!k) throw new Error("set BENCH_PRIVATE_KEY (or PRIVATE_KEY) in the environment")
 	return (k.startsWith("0x") ? k : `0x${k}`) as Hex
 }

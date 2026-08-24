@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
+import {ConflictHarness} from "./ConflictHarness.sol";
 import {Market} from "../src/Market.sol";
 import {NaiveBook} from "../bench/NaiveBook.sol";
 
@@ -25,73 +25,16 @@ import {NaiveBook} from "../bench/NaiveBook.sol";
  * packing -- which is why every attempt to measure it over a public endpoint failed.
  * If the width here is 1, no chain can save you. If it is 19, the ceiling is 19.
  */
-contract ConflictTest is Test {
+contract ConflictTest is ConflictHarness {
     uint8 constant TICKS = 19;
     uint128 constant SH = 1e18;
 
     Market market;
     NaiveBook naive;
 
-    // slot sets per transaction
-    mapping(uint256 => bytes32[]) private wr;
-    mapping(uint256 => bytes32[]) private rd;
-    uint256 private n;
-
     function setUp() public {
         market = new Market("conflict probe", address(this), address(this), 100, 1_000, 3_000, 6_000);
         naive = new NaiveBook();
-    }
-
-    function _reset() internal {
-        for (uint256 i; i < n; ++i) {
-            delete wr[i];
-            delete rd[i];
-        }
-        n = 0;
-    }
-
-    function _capture(address target) internal {
-        (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(target);
-        for (uint256 i; i < writes.length; ++i) wr[n].push(writes[i]);
-        for (uint256 i; i < reads.length; ++i) rd[n].push(reads[i]);
-        ++n;
-    }
-
-    function _intersects(bytes32[] storage a, bytes32[] storage b) internal view returns (bool) {
-        for (uint256 i; i < a.length; ++i) {
-            for (uint256 j; j < b.length; ++j) {
-                if (a[i] == b[j]) return true;
-            }
-        }
-        return false;
-    }
-
-    /// Two txs conflict if either one's writes touch the other's reads or writes.
-    function _conflicts(uint256 i, uint256 j) internal view returns (bool) {
-        return _intersects(wr[i], wr[j]) || _intersects(wr[i], rd[j]) || _intersects(wr[j], rd[i]);
-    }
-
-    /// Greedy graph colouring. Each colour is one round of concurrent execution.
-    function _rounds() internal view returns (uint256) {
-        uint256[] memory colour = new uint256[](n);
-        uint256 used;
-        for (uint256 i; i < n; ++i) {
-            bool[] memory blocked = new bool[](n + 1);
-            for (uint256 j; j < i; ++j) {
-                if (_conflicts(i, j)) blocked[colour[j]] = true;
-            }
-            uint256 c;
-            while (c < n && blocked[c]) ++c;
-            colour[i] = c;
-            if (c + 1 > used) used = c + 1;
-        }
-        return used;
-    }
-
-    function _report(string memory label, uint256 txs, uint256 rounds) internal pure {
-        // width in hundredths, because Solidity has no decimals
-        uint256 width = rounds == 0 ? 0 : (txs * 100) / rounds;
-        console2.log(label, txs, rounds, width);
     }
 
     // ---------------------------------------------------------------- experiments
