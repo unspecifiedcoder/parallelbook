@@ -1,0 +1,52 @@
+import { colour, width } from "./colour.ts"
+import { criticalPath } from "./critical-path.ts"
+import { conflictsWithNonce } from "./graph.ts"
+import { reorder } from "./reorder.ts"
+import type { AccessSet, WidthReport } from "./types.ts"
+
+/** Printed with every report. A number that describes its own limits is more
+ *  useful than a bigger number that does not. */
+export const LIMITATIONS = [
+	"width is a ceiling, not a speedup: it converts to latency only once execution, rather than block time or consensus, is the binding constraint",
+	"measured traffic is not possible traffic: a quiet block scores as parallel even for a contract that would collapse under load",
+	"greedy colouring and heuristic reordering both under-report, so these numbers are conservative",
+	"reordering changes outcomes: a reordered block is a different block, so headroom is not free throughput",
+	"account balances and nonces are excluded from conflicts; only storage slots count",
+]
+
+export function analyse(accesses: AccessSet[]): WidthReport {
+	const n = accesses.length
+	const stateRounds = colour(accesses).rounds
+	const effectiveRounds = colour(accesses, conflictsWithNonce).rounds
+	const realizedRounds = criticalPath(accesses).rounds
+	const reorderedRounds = criticalPath(reorder(accesses)).rounds
+
+	return {
+		txs: n,
+		stateWidth: width(n, stateRounds),
+		effectiveWidth: width(n, effectiveRounds),
+		realizedRounds,
+		reorderedRounds,
+		headroom: reorderedRounds === 0 ? 1 : realizedRounds / reorderedRounds,
+		limitations: LIMITATIONS,
+	}
+}
+
+function x(v: number): string {
+	return `${v.toFixed(2)}x`
+}
+
+export function formatReport(r: WidthReport): string {
+	const lines = [
+		`transactions      ${r.txs}`,
+		`stateWidth        ${x(r.stateWidth)}   ceiling from storage conflicts alone`,
+		`effectiveWidth    ${x(r.effectiveWidth)}   after account nonces serialise each sender`,
+		`realizedRounds    ${r.realizedRounds}       what the chain did, in the order it used`,
+		`reorderedRounds   ${r.reorderedRounds}       the same transactions, ordered for concurrency`,
+		`headroom          ${x(r.headroom)}   left on the table by fee-blind ordering`,
+		"",
+		"limitations:",
+		...r.limitations.map((l) => `  - ${l}`),
+	]
+	return lines.join("\n")
+}
